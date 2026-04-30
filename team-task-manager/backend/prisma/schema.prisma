@@ -1,0 +1,77 @@
+// Prisma schema for Team Task Manager
+// Local dev: SQLite (no install needed). For production swap provider to "postgresql".
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// NOTE: SQLite doesn't support native enums, so these are stored as strings.
+// Allowed values are validated at the API layer:
+//   GlobalRole  : "ADMIN" | "MEMBER"
+//   ProjectRole : "OWNER" | "ADMIN" | "MEMBER"
+//   TaskStatus  : "TODO"  | "IN_PROGRESS" | "DONE"
+//   TaskPriority: "LOW"   | "MEDIUM" | "HIGH"
+
+model User {
+  id           Int             @id @default(autoincrement())
+  name         String
+  email        String          @unique
+  password     String
+  role         String          @default("MEMBER")
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  ownedProjects     Project[]        @relation("ProjectOwner")
+  memberships       ProjectMember[]
+  createdTasks      Task[]           @relation("TaskCreator")
+  assignedTasks     Task[]           @relation("TaskAssignee")
+}
+
+model Project {
+  id          Int             @id @default(autoincrement())
+  name        String
+  description String?
+  ownerId     Int
+  owner       User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  members     ProjectMember[]
+  tasks       Task[]
+}
+
+model ProjectMember {
+  id         Int          @id @default(autoincrement())
+  projectId  Int
+  userId     Int
+  role       String       @default("MEMBER")
+  createdAt  DateTime     @default(now())
+
+  project    Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+}
+
+model Task {
+  id          Int           @id @default(autoincrement())
+  title       String
+  description String?
+  status      String        @default("TODO")
+  priority    String        @default("MEDIUM")
+  dueDate     DateTime?
+  projectId   Int
+  creatorId   Int
+  assigneeId  Int?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator     User          @relation("TaskCreator", fields: [creatorId], references: [id])
+  assignee    User?         @relation("TaskAssignee", fields: [assigneeId], references: [id])
+}
